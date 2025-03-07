@@ -175,7 +175,9 @@ export class GameWindow extends (EventEmitter as new () => TypedEmitter<GameWind
           this._authBrowserView = new BrowserView({
             webPreferences: {
               partition: 'persist:auth_' + this._index,
-              backgroundThrottling: false
+              backgroundThrottling: false,
+              // Enable devTools for debugging
+              devTools: true
             }
           })
           
@@ -190,14 +192,32 @@ export class GameWindow extends (EventEmitter as new () => TypedEmitter<GameWind
             height: contentBounds.height 
           })
           
-          // Set Android tablet user agent - use a more specific and complete user agent
+          // Set Android tablet user agent - use a very specific Dofus Touch mobile user agent
           this._authBrowserView.webContents.setUserAgent(
-            'Mozilla/5.0 (Linux; Android 10; SM-T510) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/94.0.4606.85 Safari/537.36'
+            'Mozilla/5.0 (Linux; Android 11; SM-T510) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.104 Mobile Safari/537.36 DofusTouch/1.0'
           )
           
           // Enable debugging
           this._authBrowserView.webContents.on('did-finish-load', () => {
             logger.info(`Auth browser loaded: ${this._authBrowserView?.webContents.getURL()}`)
+            
+            // Open devTools for debugging if needed
+            // this._authBrowserView?.webContents.openDevTools({ mode: 'detach' })
+            
+            // Inject script to monitor login status
+            this._authBrowserView?.webContents.executeJavaScript(`
+              // Monitor for login success
+              setInterval(() => {
+                // Check for auth tokens in localStorage
+                const hasAuthToken = localStorage.getItem('access_token') || 
+                                    localStorage.getItem('authToken') || 
+                                    localStorage.getItem('ankama_token');
+                
+                if (hasAuthToken) {
+                  console.log('AUTH_SUCCESS_DETECTED: ' + hasAuthToken);
+                }
+              }, 1000);
+            `);
           })
           
           // Log all redirects for debugging
@@ -208,6 +228,13 @@ export class GameWindow extends (EventEmitter as new () => TypedEmitter<GameWind
           // Log all responses for debugging
           this._authBrowserView.webContents.session.webRequest.onCompleted({ urls: ['*://*/*'] }, (details) => {
             logger.info(`Auth request completed: ${details.url}, status: ${details.statusCode}`)
+            
+            // Check for API responses that might contain auth tokens
+            if (details.url.includes('/api/auth') || 
+                details.url.includes('/oauth') || 
+                details.url.includes('/login')) {
+              logger.info(`Potential auth response detected: ${details.url}`)
+            }
           })
           
           // Set extra headers to make it look more like an Android tablet
@@ -220,6 +247,8 @@ export class GameWindow extends (EventEmitter as new () => TypedEmitter<GameWind
               headers['X-Requested-With'] = 'com.ankamagames.dofustouch';
               headers['Accept-Language'] = 'en-US,en;q=0.9';
               headers['Accept'] = 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9';
+              headers['Cache-Control'] = 'no-cache';
+              headers['Pragma'] = 'no-cache';
               
               // Remove desktop-specific headers
               delete headers['sec-ch-ua'];
@@ -271,7 +300,7 @@ export class GameWindow extends (EventEmitter as new () => TypedEmitter<GameWind
             this._authBrowserView?.webContents.executeJavaScript(closeButtonScript);
           });
           
-          // Listen for console messages to detect close button clicks
+          // Listen for console messages to detect close button clicks and auth success
           this._authBrowserView.webContents.on('console-message', (event, level, message) => {
             if (message.includes('close-auth-browser-requested')) {
               if (this._authBrowserView) {
@@ -279,14 +308,32 @@ export class GameWindow extends (EventEmitter as new () => TypedEmitter<GameWind
                 this._authBrowserView = null;
               }
             }
+            
+            // Check for auth success message
+            if (message.includes('AUTH_SUCCESS_DETECTED')) {
+              logger.info(`Authentication success detected: ${message}`)
+              
+              // Transfer cookies from the auth browser to the game browser
+              this._transferCookies().then(() => {
+                // Remove the browser view when authentication is complete
+                if (this._authBrowserView) {
+                  this._win.removeBrowserView(this._authBrowserView)
+                  this._authBrowserView = null
+                }
+                
+                // Reload the game window to apply the new cookies
+                this._win.webContents.reload()
+              })
+            }
           });
-
+          
           // Handle navigation events
           this._authBrowserView.webContents.on('did-navigate', (event, url) => {
             // Check if we've returned to the game URL or a specific success URL
-            // This is where you'd detect when authentication is complete
-            if (url.includes('game.dofus-touch.com') || url.includes('auth-success')) {
-              logger.info(`Authentication successful, navigated to: ${url}`)
+            if (url.includes('game.dofus-touch.com') || 
+                url.includes('auth-success') || 
+                url.includes('account.ankama.com/en/ankama/success')) {
+              logger.info(`Authentication successful navigation detected: ${url}`)
               
               // Transfer cookies from the auth browser to the game browser
               this._transferCookies().then(() => {

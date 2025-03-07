@@ -33,10 +33,25 @@ electronLocalshortcut.setKeyboardLayout(getCurrentKeyboardLayout(), getKeyMap())
 // Set application name for Windows 10+ notifications
 if (process.platform === 'win32') app.setAppUserModelId(app.getName())
 
+// Ensure single instance
 if (!app.requestSingleInstanceLock()) {
+  logger.info('Another instance is already running, quitting...')
   app.quit()
   process.exit(0)
 }
+
+// Handle second instance
+app.on('second-instance', (event, commandLine, workingDirectory) => {
+  logger.info('Second instance detected, focusing the main window')
+  if (Application.instance) {
+    const windows = Application.instance.getGameWindows()
+    if (windows.length > 0) {
+      const mainWindow = windows[0]
+      if (mainWindow.isMinimized()) mainWindow.restore()
+      mainWindow.focus()
+    }
+  }
+})
 
 app.whenReady().then(async () => {
   logger.debug('App -> whenReady')
@@ -58,6 +73,16 @@ app.on('open-url', (event, url) => {
   }
 })
 
+// Ensure proper cleanup when app is closed
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit()
+  logger.info('All windows closed, quitting application')
+  app.quit()
+})
+
+// Force quit the app and all processes
+app.on('quit', () => {
+  logger.info('Application quitting, forcing exit')
+  setTimeout(() => {
+    process.exit(0)
+  }, 100)
 })

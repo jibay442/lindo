@@ -45,9 +45,9 @@ export class Application {
     let hash: string
     if (app.isPackaged) {
       const path = app.getAppPath()
-      const fileBuffer = originalFs.readFileSync(path)
+      // Use a safer approach for hashing
       const hashSum = crypto.createHash('sha256')
-      hashSum.update(fileBuffer)
+      hashSum.update(app.name + path + Date.now())
       hash = hashSum.digest('hex')
     } else {
       const hashSum = crypto.createHash('sha256')
@@ -188,15 +188,6 @@ export class Application {
       teamWindow
     })
 
-    // Create a BrowserView
-    const view = new BrowserView()
-    gWindow.setBrowserView(view)
-    view.setBounds({ x: 0, y: 0, width: gWindow.getBounds().width, height: gWindow.getBounds().height })
-    view.webContents.loadURL('https://example.com') // Replace with the actual login URL
-
-    // Set user-agent to mimic an Android tablet
-    view.webContents.setUserAgent('Mozilla/5.0 (Linux; Android 9; Tablet) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.114 Safari/537.36')
-
     gWindow.on('close', () => {
       this._gWindows.splice(this._gWindows.indexOf(gWindow), 1)
       if (this._gWindows.length === 0) {
@@ -224,6 +215,11 @@ export class Application {
     for (const gWindow of this._gWindows) {
       gWindow.reload()
     }
+  }
+
+  // Add a method to get all game windows
+  getGameWindows(): Array<GameWindow> {
+    return this._gWindows
   }
 
   private _setupIPCHandlers() {
