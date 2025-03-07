@@ -192,9 +192,9 @@ export class GameWindow extends (EventEmitter as new () => TypedEmitter<GameWind
             height: contentBounds.height 
           })
           
-          // Set Android tablet user agent - use a very specific Dofus Touch mobile user agent
+          // Set Android tablet user agent - use a very specific Dofus Touch mobile user agent with the correct version
           this._authBrowserView.webContents.setUserAgent(
-            'Mozilla/5.0 (Linux; Android 11; SM-T510) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.104 Mobile Safari/537.36 DofusTouch/1.0'
+            'Mozilla/5.0 (Linux; Android 11; SM-T510) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.104 Mobile Safari/537.36 DofusTouch/3.7.1'
           )
           
           // Enable debugging
@@ -204,8 +204,32 @@ export class GameWindow extends (EventEmitter as new () => TypedEmitter<GameWind
             // Open devTools for debugging if needed
             // this._authBrowserView?.webContents.openDevTools({ mode: 'detach' })
             
-            // Inject script to monitor login status
+            // Inject Android environment emulation
             this._authBrowserView?.webContents.executeJavaScript(`
+              // Emulate Android environment
+              window.navigator.userAgent = 'Mozilla/5.0 (Linux; Android 11; SM-T510) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.104 Mobile Safari/537.36 DofusTouch/3.7.1';
+              
+              // Add Android-specific properties
+              window.navigator.platform = 'Android';
+              window.navigator.appVersion = '5.0 (Linux; Android 11; SM-T510) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.104 Mobile Safari/537.36 DofusTouch/3.7.1';
+              
+              // Mock Android APIs
+              window.Android = {
+                getVersion: function() { return '3.7.1'; },
+                getDeviceId: function() { return '${crypto.randomUUID()}'; },
+                getDeviceModel: function() { return 'SM-T510'; },
+                getDeviceManufacturer: function() { return 'Samsung'; },
+                getDeviceProduct: function() { return 'gta3xlwifi'; },
+                getDeviceSdk: function() { return '30'; }, // Android 11
+                isTablet: function() { return true; }
+              };
+              
+              // Mock Cordova environment if needed
+              window.cordova = {
+                version: '10.0.0',
+                platformId: 'android'
+              };
+              
               // Monitor for login success
               setInterval(() => {
                 // Check for auth tokens in localStorage
@@ -217,12 +241,96 @@ export class GameWindow extends (EventEmitter as new () => TypedEmitter<GameWind
                   console.log('AUTH_SUCCESS_DETECTED: ' + hasAuthToken);
                 }
               }, 1000);
+              
+              // Override touch events to make them work better
+              const originalTouch = window.ontouchstart;
+              window.ontouchstart = function(e) {
+                console.log('Touch event intercepted');
+                if (originalTouch) originalTouch.call(this, e);
+              };
+              
+              // Log any authentication errors
+              const originalFetch = window.fetch;
+              window.fetch = function(...args) {
+                const url = args[0];
+                if (typeof url === 'string' && (url.includes('auth') || url.includes('login'))) {
+                  console.log('AUTH_FETCH: ' + url);
+                  return originalFetch.apply(this, args)
+                    .then(response => {
+                      console.log('AUTH_RESPONSE: ' + response.status);
+                      return response;
+                    })
+                    .catch(error => {
+                      console.error('AUTH_ERROR: ' + error);
+                      throw error;
+                    });
+                }
+                return originalFetch.apply(this, args);
+              };
+              
+              console.log('Android environment emulation injected');
             `);
           })
           
           // Log all redirects for debugging
           this._authBrowserView.webContents.on('did-redirect-navigation', (event, url, isInPlace, isMainFrame) => {
             logger.info(`Auth browser redirected to: ${url}`)
+            
+            // Check for specific Dofus Touch authentication URLs
+            if (url.includes('account.ankama.com/auth/dofus-touch')) {
+              logger.info('Detected Dofus Touch specific authentication URL')
+              
+              // Inject additional Dofus Touch specific code
+              this._authBrowserView?.webContents.executeJavaScript(`
+                // Add Dofus Touch specific objects
+                window.DofusTouch = {
+                  version: '3.7.1',
+                  build: '${Date.now()}',
+                  platform: 'android',
+                  getDeviceInfo: function() {
+                    return {
+                      model: 'SM-T510',
+                      manufacturer: 'Samsung',
+                      platform: 'Android',
+                      version: '11',
+                      uuid: '${crypto.randomUUID()}',
+                      isVirtual: false
+                    };
+                  }
+                };
+                
+                // Try to auto-fill login form if present
+                setTimeout(() => {
+                  const loginForm = document.querySelector('form[action*="login"]');
+                  if (loginForm) {
+                    console.log('Login form detected, attempting to enhance it');
+                    
+                    // Add hidden fields that might be expected from the mobile app
+                    const hiddenFields = [
+                      { name: 'client_id', value: 'dofus_touch' },
+                      { name: 'response_type', value: 'code' },
+                      { name: 'redirect_uri', value: 'dofustouch://auth' },
+                      { name: 'scope', value: 'openid dofus_touch' },
+                      { name: 'state', value: '${crypto.randomUUID()}' },
+                      { name: 'code_challenge_method', value: 'S256' },
+                      { name: 'platform', value: 'android' },
+                      { name: 'app_version', value: '3.7.1' }
+                    ];
+                    
+                    hiddenFields.forEach(field => {
+                      if (!loginForm.querySelector('input[name="' + field.name + '"]')) {
+                        const input = document.createElement('input');
+                        input.type = 'hidden';
+                        input.name = field.name;
+                        input.value = field.value;
+                        loginForm.appendChild(input);
+                        console.log('Added hidden field: ' + field.name);
+                      }
+                    });
+                  }
+                }, 1000);
+              `);
+            }
           })
           
           // Log all responses for debugging
@@ -249,6 +357,13 @@ export class GameWindow extends (EventEmitter as new () => TypedEmitter<GameWind
               headers['Accept'] = 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9';
               headers['Cache-Control'] = 'no-cache';
               headers['Pragma'] = 'no-cache';
+              
+              // Add mobile-specific headers
+              headers['X-DofusTouch-Version'] = '3.7.1';
+              headers['X-Android-Version'] = '11';
+              headers['X-Android-SDK'] = '30';
+              headers['X-Android-Device'] = 'SM-T510';
+              headers['X-Android-Manufacturer'] = 'Samsung';
               
               // Remove desktop-specific headers
               delete headers['sec-ch-ua'];
@@ -494,7 +609,8 @@ export class GameWindow extends (EventEmitter as new () => TypedEmitter<GameWind
             path: cookie.path,
             secure: cookie.secure,
             httpOnly: cookie.httpOnly,
-            expirationDate: cookie.expirationDate
+            expirationDate: cookie.expirationDate,
+            sameSite: cookie.sameSite
           }
           
           // Set the cookie in the main window
@@ -502,6 +618,40 @@ export class GameWindow extends (EventEmitter as new () => TypedEmitter<GameWind
           logger.info(`Transferred cookie: ${cookie.name}`)
         } catch (err) {
           logger.error(`Failed to transfer cookie ${cookie.name}: ${err}`)
+        }
+      }
+      
+      // Also transfer localStorage data
+      if (this._authBrowserView.webContents && this._win.webContents) {
+        try {
+          // Get localStorage data from auth browser
+          const localStorageData = await this._authBrowserView.webContents.executeJavaScript(`
+            Object.keys(localStorage).reduce((result, key) => {
+              result[key] = localStorage.getItem(key);
+              return result;
+            }, {});
+          `);
+          
+          // Set localStorage data in game browser
+          if (localStorageData && Object.keys(localStorageData).length > 0) {
+            logger.info(`Transferring ${Object.keys(localStorageData).length} localStorage items`);
+            
+            const setLocalStorageScript = `
+              const data = ${JSON.stringify(localStorageData)};
+              Object.keys(data).forEach(key => {
+                try {
+                  localStorage.setItem(key, data[key]);
+                  console.log('Set localStorage item: ' + key);
+                } catch (e) {
+                  console.error('Failed to set localStorage item: ' + key, e);
+                }
+              });
+            `;
+            
+            await this._win.webContents.executeJavaScript(setLocalStorageScript);
+          }
+        } catch (err) {
+          logger.error(`Failed to transfer localStorage data: ${err}`);
         }
       }
       
