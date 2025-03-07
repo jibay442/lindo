@@ -6,6 +6,7 @@ import { useI18nContext } from '@lindo/i18n'
 import { reaction } from 'mobx'
 import React, { memo, useEffect, useRef } from 'react'
 import { useGameManager } from './use-game-manager'
+import { injectGooglePlayServices } from '@/utils'
 
 export interface GameScreenProps {
   game: Game
@@ -112,17 +113,6 @@ export const GameScreen = memo(({ game }: GameScreenProps) => {
             window.navigator.platform = 'Android';
             window.navigator.appVersion = '5.0 (Linux; Android 11; SM-T510) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.104 Mobile Safari/537.36 DofusTouch/3.7.1';
             
-            // Mock Android APIs
-            window.Android = {
-              getVersion: function() { return '3.7.1'; },
-              getDeviceId: function() { return '${crypto.randomUUID()}'; },
-              getDeviceModel: function() { return 'SM-T510'; },
-              getDeviceManufacturer: function() { return 'Samsung'; },
-              getDeviceProduct: function() { return 'gta3xlwifi'; },
-              getDeviceSdk: function() { return '30'; }, // Android 11
-              isTablet: function() { return true; }
-            };
-            
             // Intercept fetch and XMLHttpRequest to add mobile headers
             const originalFetch = window.fetch;
             window.fetch = function(...args) {
@@ -158,6 +148,12 @@ export const GameScreen = memo(({ game }: GameScreenProps) => {
           // Remove the script elements after execution
           gameDocument.head.removeChild(versionScript);
           gameDocument.head.removeChild(mobileScript);
+          
+          // Inject Google Play Services emulation
+          injectGooglePlayServices(gameWindow);
+          
+          // Log success
+          console.log('All emulation scripts injected successfully');
         } catch (error) {
           window.lindoAPI.logger.error('Failed to update game client version: ' + error)();
         }

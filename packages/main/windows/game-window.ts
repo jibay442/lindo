@@ -221,13 +221,45 @@ export class GameWindow extends (EventEmitter as new () => TypedEmitter<GameWind
                 getDeviceManufacturer: function() { return 'Samsung'; },
                 getDeviceProduct: function() { return 'gta3xlwifi'; },
                 getDeviceSdk: function() { return '30'; }, // Android 11
-                isTablet: function() { return true; }
+                isTablet: function() { return true; },
+                getGoogleAccountId: function() { return '${Math.floor(Math.random() * 1000000000)}'; },
+                getGoogleAccountName: function() { return 'user${Math.floor(Math.random() * 1000)}@gmail.com'; },
+                isGooglePlayServicesAvailable: function() { return true; },
+                getGooglePlayServicesVersion: function() { return '23.18.19'; }
               };
               
-              // Mock Cordova environment if needed
-              window.cordova = {
-                version: '10.0.0',
-                platformId: 'android'
+              // Mock Google Play Services
+              window.googlePlayServices = {
+                isAvailable: true,
+                isConnected: true,
+                connect: function(callback) {
+                  console.log('Google Play Services: connect called');
+                  setTimeout(function() {
+                    if (callback) callback({ result: true });
+                  }, 300);
+                },
+                getVersion: function() {
+                  console.log('Google Play Services: getVersion called');
+                  return '23.18.19';
+                }
+              };
+              
+              // Mock Google Play Store
+              window.PlayStore = {
+                getPackageInfo: function(packageName) {
+                  console.log('PlayStore: getPackageInfo called for ' + packageName);
+                  return {
+                    versionName: '3.7.1',
+                    versionCode: 371,
+                    packageName: packageName || 'com.ankamagames.dofustouch',
+                    firstInstallTime: Date.now() - 30 * 24 * 60 * 60 * 1000, // 30 days ago
+                    lastUpdateTime: Date.now() - 2 * 24 * 60 * 60 * 1000 // 2 days ago
+                  };
+                },
+                isInstalled: function(packageName) {
+                  console.log('PlayStore: isInstalled called for ' + packageName);
+                  return packageName === 'com.ankamagames.dofustouch';
+                }
               };
               
               // Monitor for login success
@@ -517,9 +549,6 @@ export class GameWindow extends (EventEmitter as new () => TypedEmitter<GameWind
     })
 
     attachTitlebarToWindow(this._win)
-
-    // Listen for window resize events to update the browser view size
-    this._win.on('resize', this._updateAuthBrowserViewBounds.bind(this))
   }
 
   static async init({
