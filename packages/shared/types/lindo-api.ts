@@ -58,4 +58,8 @@ export interface LindoAPI {
   resetGameData: () => void
   clearCache: () => void
   logger: LindoLogger
+  // WSA
+  createWSAWindow: () => Promise<boolean>
+  closeWSAWindow: () => Promise<boolean>
+  checkWSARequirements: () => Promise<{ meetsRequirements: boolean, issues: string[] }>
 }

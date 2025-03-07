@@ -17,13 +17,8 @@ app.commandLine.appendSwitch('disable-background-timer-throttling')
 // more webgl and less black screen (default is probably 16, maybe...)
 app.commandLine.appendSwitch('max-active-webgl-contexts', '32')
 
-// Register protocol handlers for dofustouch:// and ankama:// URLs
-if (process.defaultApp) {
-  if (process.argv.length >= 2) {
-    app.setAsDefaultProtocolClient('dofustouch', process.execPath, [process.argv[1]])
-    app.setAsDefaultProtocolClient('ankama', process.execPath, [process.argv[1]])
-  }
-} else {
+// Register protocol handler for dofustouch:// and ankama:// URLs
+if (process.platform === 'win32') {
   app.setAsDefaultProtocolClient('dofustouch')
   app.setAsDefaultProtocolClient('ankama')
 }

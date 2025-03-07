@@ -1,0 +1,51 @@
+{
+  "appId": "com.lindo.app",
+  "productName": "Lindo",
+  "copyright": "Copyright © 2022 Zenox, Prixe",
+  "asar": true,
+  "directories": {
+    "output": "release/${version}",
+    "buildResources": "resources"
+  },
+  "files": [
+    "dist",
+    "CHANGELOG.md",
+    "LICENCE"
+  ],
+  "extraResources": [
+    {
+      "from": "resources/icon.png",
+      "to": "icon.png"
+    }
+  ],
+  "win": {
+    "icon": "resources/icon.ico",
+    "target": [
+      {
+        "target": "portable",
+        "arch": [
+          "x64"
+        ]
+      }
+    ],
+    "extraResources": [
+      {
+        "from": "resources/icon.ico",
+        "to": "icon.ico"
+      }
+    ],
+    "requestedExecutionLevel": "asInvoker",
+    "artifactName": "${productName}-${version}-${arch}.${ext}"
+  },
+  "portable": {
+    "artifactName": "${productName}-Portable-${version}-${arch}.${ext}"
+  },
+  "nsis": {
+    "oneClick": false,
+    "perMachine": false,
+    "allowToChangeInstallationDirectory": true,
+    "deleteAppDataOnUninstall": false,
+    "artifactName": "${productName}-Setup-${version}-${arch}.${ext}"
+  },
+  "publish": null
+} 

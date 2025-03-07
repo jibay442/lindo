@@ -229,6 +229,20 @@ const clearCache = () => {
   ipcRenderer.send(IPCEvents.CLEAR_CACHE)
 }
 
+// WSA
+const createWSAWindow = async (): Promise<boolean> => {
+  return ipcRenderer.invoke(IPCEvents.CREATE_WSA_WINDOW)
+}
+
+const closeWSAWindow = async (): Promise<boolean> => {
+  return ipcRenderer.invoke(IPCEvents.CLOSE_WSA_WINDOW)
+}
+
+const checkWSARequirements = async (): Promise<{ meetsRequirements: boolean, issues: string[] }> => {
+  const result = await ipcRenderer.invoke(IPCEvents.CHECK_WSA_REQUIREMENTS)
+  return JSON.parse(result)
+}
+
 const logger: LindoLogger = {
   debug: (...params: unknown[]) => {
     ipcRenderer.send(IPCEvents.LOGGER_DEBUG, ...params)
@@ -292,6 +306,10 @@ const lindoApi: LindoAPI = {
   sendAutoGroupPathInstruction,
   resetGameData,
   clearCache,
-  logger
+  logger,
+  createWSAWindow,
+  closeWSAWindow,
+  checkWSARequirements
 }
+
 contextBridge.exposeInMainWorld('lindoAPI', lindoApi)

@@ -8,7 +8,13 @@ export default defineConfig({
   build: {
     outDir: '../../dist/preload',
     emptyOutDir: true,
-    minify: process.env./* from mode option */ NODE_ENV === 'production',
+    minify: 'terser',
+    terserOptions: {
+      compress: {
+        drop_console: process.env.NODE_ENV === 'production',
+        drop_debugger: process.env.NODE_ENV === 'production'
+      }
+    },
     // https://github.com/caoxiemeihao/electron-vue-vite/issues/61
     sourcemap: 'inline',
     // Increase the chunk size warning limit

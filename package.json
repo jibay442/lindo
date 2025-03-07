@@ -12,6 +12,10 @@
     "lint": "tsc --noEmit -p packages/renderer/tsconfig.json && eslint packages",
     "dev": "concurrently -K -n watch,i18n \"node scripts/watch.mjs\" \"npx typesafe-i18n\"",
     "build": "tsc --noEmit -p packages/renderer/tsconfig.json && node scripts/build.mjs && electron-builder --publish never",
+    "build-windows": "tsc --noEmit -p packages/renderer/tsconfig.json && node scripts/build-windows.mjs",
+    "fix-build": "node scripts/fix-build.mjs",
+    "fix-windows": "node scripts/fix-windows-launch.mjs",
+    "check-main": "node scripts/check-main-process.mjs",
     "fast-build": "tsc --noEmit -p packages/renderer/tsconfig.json && node scripts/optimized-build.mjs && electron-builder --publish never",
     "typesafe-i18n": "typesafe-i18n"
   },
@@ -51,6 +55,7 @@
     "@dnd-kit/modifiers": "^6.0.0",
     "@dnd-kit/sortable": "^7.0.0",
     "@dnd-kit/utilities": "^3.2.0",
+    "@emotion/babel-plugin": "^11.9.2",
     "@emotion/react": "^11.9.0",
     "@emotion/styled": "^11.8.1",
     "@mui/icons-material": "^5.8.2",

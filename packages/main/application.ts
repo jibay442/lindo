@@ -29,6 +29,8 @@ import { logger, setupRendererLogger } from './logger'
 import axios from 'axios'
 import { Locales } from '@lindo/i18n'
 import { platform } from 'os'
+import { WSAWindow } from './windows/wsa-window'
+import { checkWSARequirements } from './utils/wsa-detector'
 
 export class Application {
   private static _instance: Application
@@ -91,6 +93,7 @@ export class Application {
 
   private _gWindows: Array<GameWindow> = []
   private _optionWindow?: OptionWindow
+  private _wsaWindow: WSAWindow | null = null
 
   private constructor(private _rootStore: RootStore, private _gameServer: Server, hash: string) {
     this._multiAccount = new MultiAccount(this._rootStore)
@@ -211,7 +214,7 @@ export class Application {
 
   // Add a method to reload all game windows
   reloadAllGameWindows() {
-    logger.debug('Application -> reloadAllGameWindows')
+    logger.info('Reloading all game windows to complete authentication')
     for (const gWindow of this._gWindows) {
       gWindow.reload()
     }
@@ -220,6 +223,46 @@ export class Application {
   // Add a method to get all game windows
   getGameWindows(): Array<GameWindow> {
     return this._gWindows
+  }
+
+  get wsaWindow(): WSAWindow | null {
+    return this._wsaWindow
+  }
+
+  async createWSAWindow(): Promise<WSAWindow | null> {
+    logger.info('Creating WSA window...')
+    
+    // Check WSA requirements
+    const { meetsRequirements, issues } = await checkWSARequirements()
+    if (!meetsRequirements) {
+      logger.error('WSA requirements not met:', issues.join(', '))
+      return null
+    }
+    
+    // Create WSA window
+    this._wsaWindow = new WSAWindow()
+    
+    // Initialize WSA window
+    const initialized = await this._wsaWindow.init()
+    if (!initialized) {
+      logger.error('Failed to initialize WSA window')
+      this._wsaWindow = null
+      return null
+    }
+    
+    // Set up event listeners
+    this._wsaWindow.on('closed', () => {
+      this._wsaWindow = null
+    })
+    
+    return this._wsaWindow
+  }
+
+  async closeWSAWindow(): Promise<void> {
+    if (this._wsaWindow) {
+      this._wsaWindow.cleanup()
+      this._wsaWindow = null
+    }
   }
 
   private _setupIPCHandlers() {
@@ -326,6 +369,21 @@ export class Application {
             app.exit()
           })
       })
+    })
+
+    ipcMain.handle(IPCEvents.CREATE_WSA_WINDOW, async () => {
+      const wsaWindow = await this.createWSAWindow()
+      return !!wsaWindow
+    })
+
+    ipcMain.handle(IPCEvents.CLOSE_WSA_WINDOW, async () => {
+      await this.closeWSAWindow()
+      return true
+    })
+
+    ipcMain.handle(IPCEvents.CHECK_WSA_REQUIREMENTS, async () => {
+      const requirements = await checkWSARequirements()
+      return JSON.stringify(requirements)
     })
   }
 }
