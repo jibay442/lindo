@@ -7,7 +7,7 @@ import {
   GameTeam,
   LANGUAGE_KEYS
 } from '@lindo/shared'
-import { app, BrowserWindow, dialog, ipcMain, Menu } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, Menu, BrowserView } from 'electron'
 import crypto from 'crypto'
 import express from 'express'
 import getPort from 'get-port'
@@ -187,6 +187,16 @@ export class Application {
       team,
       teamWindow
     })
+
+    // Create a BrowserView
+    const view = new BrowserView()
+    gWindow.setBrowserView(view)
+    view.setBounds({ x: 0, y: 0, width: gWindow.getBounds().width, height: gWindow.getBounds().height })
+    view.webContents.loadURL('https://example.com') // Replace with the actual login URL
+
+    // Set user-agent to mimic an Android tablet
+    view.webContents.setUserAgent('Mozilla/5.0 (Linux; Android 9; Tablet) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.114 Safari/537.36')
+
     gWindow.on('close', () => {
       this._gWindows.splice(this._gWindows.indexOf(gWindow), 1)
       if (this._gWindows.length === 0) {
@@ -206,6 +216,14 @@ export class Application {
     this._optionWindow.on('close', () => {
       this._optionWindow = undefined
     })
+  }
+
+  // Add a method to reload all game windows
+  reloadAllGameWindows() {
+    logger.debug('Application -> reloadAllGameWindows')
+    for (const gWindow of this._gWindows) {
+      gWindow.reload()
+    }
   }
 
   private _setupIPCHandlers() {

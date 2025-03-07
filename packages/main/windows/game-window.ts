@@ -207,6 +207,50 @@ export class GameWindow extends (EventEmitter as new () => TypedEmitter<GameWind
               }
             }
           })
+
+          // Handle custom URL schemes (dofustouch://)
+          this._authBrowserView.webContents.on('will-navigate', (event, url) => {
+            if (url.startsWith('dofustouch://') || 
+                url.startsWith('ankama://') || 
+                !url.startsWith('http')) {
+              // Prevent the default navigation
+              event.preventDefault()
+              
+              // Handle the custom URL scheme here
+              logger.info(`Intercepted custom URL scheme: ${url}`)
+              
+              // Remove the browser view
+              if (this._authBrowserView) {
+                this._win.removeBrowserView(this._authBrowserView)
+                this._authBrowserView = null
+              }
+              
+              // Reload the game window to complete the authentication
+              this._win.webContents.reload()
+            }
+          })
+
+          // Handle new window events in the auth browser view
+          this._authBrowserView.webContents.setWindowOpenHandler(({ url }) => {
+            logger.info(`Auth browser attempted to open new window: ${url}`)
+            
+            // If it's a custom URL scheme, handle it
+            if (url.startsWith('dofustouch://') || 
+                url.startsWith('ankama://') || 
+                !url.startsWith('http')) {
+              
+              // Remove the browser view
+              if (this._authBrowserView) {
+                this._win.removeBrowserView(this._authBrowserView)
+                this._authBrowserView = null
+              }
+              
+              // Reload the game window to complete the authentication
+              this._win.webContents.reload()
+            }
+            
+            return { action: 'deny' }
+          })
         }
         
         // Load the URL in the browser view
@@ -255,6 +299,8 @@ export class GameWindow extends (EventEmitter as new () => TypedEmitter<GameWind
   focus = () => this._win.focus()
   isMinimized = () => this._win.isMinimized()
   restore = () => this._win.restore()
+  
+  reload = () => this._win.webContents.reload()
 
   toggleMaximize() {
     return this._win.isMaximized() ? this._win.unmaximize() : this._win.maximize()

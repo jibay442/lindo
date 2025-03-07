@@ -17,6 +17,17 @@ app.commandLine.appendSwitch('disable-background-timer-throttling')
 // more webgl and less black screen (default is probably 16, maybe...)
 app.commandLine.appendSwitch('max-active-webgl-contexts', '32')
 
+// Register protocol handlers for dofustouch:// and ankama:// URLs
+if (process.defaultApp) {
+  if (process.argv.length >= 2) {
+    app.setAsDefaultProtocolClient('dofustouch', process.execPath, [process.argv[1]])
+    app.setAsDefaultProtocolClient('ankama', process.execPath, [process.argv[1]])
+  }
+} else {
+  app.setAsDefaultProtocolClient('dofustouch')
+  app.setAsDefaultProtocolClient('ankama')
+}
+
 electronLocalshortcut.setKeyboardLayout(getCurrentKeyboardLayout(), getKeyMap())
 
 // Set application name for Windows 10+ notifications
@@ -33,6 +44,18 @@ app.whenReady().then(async () => {
   const store = await setupRootStore()
   await Application.init(store)
   Application.instance.run()
+})
+
+// Handle protocol activations
+app.on('open-url', (event, url) => {
+  event.preventDefault()
+  logger.info(`App received open-url event with URL: ${url}`)
+  
+  // If the app is already running, handle the URL
+  if (Application.instance) {
+    // Reload all game windows to complete authentication
+    Application.instance.reloadAllGameWindows()
+  }
 })
 
 app.on('window-all-closed', () => {
