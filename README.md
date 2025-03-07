@@ -1,27 +1,6 @@
 # Lindo
 
-[![Build & Publish](https://github.com/prixe/lindo/actions/workflows/build.yml/badge.svg)](https://github.com/prixe/lindo/actions/workflows/build.yml)
-[![Current release](https://badgen.net/github/release/prixe/lindo)](https://github.com/prixe/lindo/releases/latest)
-[![Compatible os](https://badgen.net/badge/os/windows%20%7C%20macOS%20%7C%20linux/black)](https://github.com/prixe/lindo/releases/latest)
-[![Minimum node](https://img.shields.io/badge/node-%3E%3D%2016.0.0-green.svg)]()
-[![Github All Releases](https://img.shields.io/github/downloads/prixe/lindo/total.svg)](https://github.com/prixe/lindo/releases)
-[![Contributors](https://img.shields.io/github/contributors/prixe/lindo.svg)](https://github.com/prixe/lindo/graphs/contributors)
-[![Website lindo-app.com](https://img.shields.io/website-up-down-green-red/http/shields.io.svg)](https://lindo-app.com)
-
 ![Lindo in game screenshot](./screenshots/lindo-ingame.png)
-
-## Links
-Official [WebSite](https://lindo-app.com) 
-
-Find us on Reddit to exchange with the community!
-
-- [Reddit](https://www.reddit.com/r/LindoApp/)
-
-We are also on Twitter, Telegram and Matrix if you want to get notified of new updates:
-
-- [Twitter](https://twitter.com/Lindo_Officiel)
-- [Matrix](https://matrix.to/#/#lindo-official:matrix.org) (chat server like discord)
-- [Telegram](https://t.me/+8jEjvFd5M-g4NTc0)
 
 
 **⚠️ Dofus Touch is the entire property of Ankama Games, and we are not affiliated with Ankama. None of the files hosted in this repository are under copyright: They come from Open Source projects, libraries, the original DofusTouch No-Emu created by Daniel & Thomas and the work of direct contributors. We do not intend to cause any harm to Ankama Games and will never take any revenue from this project.**
