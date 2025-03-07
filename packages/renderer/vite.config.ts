@@ -132,7 +132,8 @@ export default defineConfig({
  * @see https://github.com/caoxiemeihao/electron-vue-vite/issues/52
  */
 export function electron(entries: Parameters<typeof optimizer>[0] = {}): Plugin {
-  const builtins = builtinModules.filter((t) => !t.startsWith('_'))
+  // Filter out problematic modules like 'node:test' that cause issues with vite-plugin-optimizer
+  const builtins = builtinModules.filter((t) => !t.startsWith('_') && t !== 'test' && !t.includes(':'))
 
   /**
    * @see https://github.com/caoxiemeihao/vite-plugins/tree/main/packages/resolve#readme
