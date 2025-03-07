@@ -1,5 +1,5 @@
 import { FollowInstruction, GameTeam, GameTeamWindow, IPCEvents, MultiAccountContext, RootStore } from '@lindo/shared'
-import { app, BeforeSendResponse, BrowserWindow, shell } from 'electron'
+import { app, BeforeSendResponse, BrowserWindow, BrowserView, shell } from 'electron'
 import { attachTitlebarToWindow } from 'custom-electron-titlebar/main'
 import { join } from 'path'
 import { EventEmitter } from 'stream'
@@ -21,6 +21,7 @@ export class GameWindow extends (EventEmitter as new () => TypedEmitter<GameWind
   private _isMuted = false
   private readonly _index: number
   private readonly _shortcutStoreDisposer: () => void
+  private _authBrowserView: BrowserView | null = null
 
   get id() {
     return this._win.webContents.id!
@@ -168,11 +169,57 @@ export class GameWindow extends (EventEmitter as new () => TypedEmitter<GameWind
     }
     // Make all links open with the browser, not with the application
     this._win.webContents.setWindowOpenHandler(({ url }) => {
-      if (url.startsWith('https:')) shell.openExternal(url)
+      if (url.startsWith('https:')) {
+        // Create a browser view for authentication if it doesn't exist
+        if (!this._authBrowserView) {
+          this._authBrowserView = new BrowserView({
+            webPreferences: {
+              partition: 'persist:auth_' + this._index,
+              backgroundThrottling: false
+            }
+          })
+          
+          // Set the bounds to fill the window
+          const bounds = this._win.getBounds()
+          const contentBounds = this._win.getContentBounds()
+          this._win.setBrowserView(this._authBrowserView)
+          this._authBrowserView.setBounds({ 
+            x: 0, 
+            y: 0, 
+            width: contentBounds.width, 
+            height: contentBounds.height 
+          })
+          
+          // Set Android tablet user agent
+          this._authBrowserView.webContents.setUserAgent(
+            'Mozilla/5.0 (Linux; Android 9; SM-T830 Build/PPR1.180610.011) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.114 Safari/537.36'
+          )
+          
+          // Handle navigation events
+          this._authBrowserView.webContents.on('did-navigate', (event, url) => {
+            // Check if we've returned to the game URL or a specific success URL
+            // This is where you'd detect when authentication is complete
+            if (url.includes('game.dofus-touch.com') || url.includes('auth-success')) {
+              // Remove the browser view when authentication is complete
+              if (this._authBrowserView) {
+                this._win.removeBrowserView(this._authBrowserView)
+                this._authBrowserView = null
+              }
+            }
+          })
+        }
+        
+        // Load the URL in the browser view
+        this._authBrowserView.webContents.loadURL(url)
+        return { action: 'deny' }
+      }
       return { action: 'deny' }
     })
 
     attachTitlebarToWindow(this._win)
+
+    // Listen for window resize events to update the browser view size
+    this._win.on('resize', this._updateAuthBrowserViewBounds.bind(this))
   }
 
   static async init({
@@ -193,6 +240,12 @@ export class GameWindow extends (EventEmitter as new () => TypedEmitter<GameWind
   }
 
   private _close(event: Event) {
+    // Clean up the auth browser view if it exists
+    if (this._authBrowserView) {
+      this._win.removeBrowserView(this._authBrowserView)
+      this._authBrowserView = null
+    }
+    
     this._win.removeAllListeners()
     electronLocalshortcut.unregisterAll(this._win)
     this._shortcutStoreDisposer()
@@ -218,5 +271,18 @@ export class GameWindow extends (EventEmitter as new () => TypedEmitter<GameWind
 
   clearCache() {
     return this._win.webContents.session.clearCache()
+  }
+
+  // Method to update the browser view bounds when the window is resized
+  private _updateAuthBrowserViewBounds() {
+    if (this._authBrowserView) {
+      const contentBounds = this._win.getContentBounds()
+      this._authBrowserView.setBounds({
+        x: 0,
+        y: 0,
+        width: contentBounds.width,
+        height: contentBounds.height
+      })
+    }
   }
 }
