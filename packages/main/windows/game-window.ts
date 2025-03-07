@@ -190,21 +190,115 @@ export class GameWindow extends (EventEmitter as new () => TypedEmitter<GameWind
             height: contentBounds.height 
           })
           
-          // Set Android tablet user agent
+          // Set Android tablet user agent - use a more specific and complete user agent
           this._authBrowserView.webContents.setUserAgent(
-            'Mozilla/5.0 (Linux; Android 9; SM-T830 Build/PPR1.180610.011) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.114 Safari/537.36'
+            'Mozilla/5.0 (Linux; Android 10; SM-T510) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/94.0.4606.85 Safari/537.36'
           )
           
+          // Enable debugging
+          this._authBrowserView.webContents.on('did-finish-load', () => {
+            logger.info(`Auth browser loaded: ${this._authBrowserView?.webContents.getURL()}`)
+          })
+          
+          // Log all redirects for debugging
+          this._authBrowserView.webContents.on('did-redirect-navigation', (event, url, isInPlace, isMainFrame) => {
+            logger.info(`Auth browser redirected to: ${url}`)
+          })
+          
+          // Log all responses for debugging
+          this._authBrowserView.webContents.session.webRequest.onCompleted({ urls: ['*://*/*'] }, (details) => {
+            logger.info(`Auth request completed: ${details.url}, status: ${details.statusCode}`)
+          })
+          
+          // Set extra headers to make it look more like an Android tablet
+          this._authBrowserView.webContents.session.webRequest.onBeforeSendHeaders(
+            { urls: ['*://*/*'] },
+            (details, callback) => {
+              const headers = details.requestHeaders;
+              
+              // Add Android-specific headers
+              headers['X-Requested-With'] = 'com.ankamagames.dofustouch';
+              headers['Accept-Language'] = 'en-US,en;q=0.9';
+              headers['Accept'] = 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9';
+              
+              // Remove desktop-specific headers
+              delete headers['sec-ch-ua'];
+              delete headers['sec-ch-ua-mobile'];
+              delete headers['sec-ch-ua-platform'];
+              
+              callback({ requestHeaders: headers });
+            }
+          );
+          
+          // Add a close button to the browser view
+          const closeButtonScript = `
+            // Create a button element
+            const closeButton = document.createElement('button');
+            closeButton.style.position = 'fixed';
+            closeButton.style.top = '10px';
+            closeButton.style.right = '10px';
+            closeButton.style.width = '40px';
+            closeButton.style.height = '40px';
+            closeButton.style.backgroundColor = 'rgba(255, 0, 0, 0.8)';
+            closeButton.style.color = 'white';
+            closeButton.style.border = 'none';
+            closeButton.style.borderRadius = '50%';
+            closeButton.style.fontSize = '20px';
+            closeButton.style.fontWeight = 'bold';
+            closeButton.style.zIndex = '9999999';
+            closeButton.style.cursor = 'pointer';
+            closeButton.textContent = 'X';
+            
+            // Add hover effect
+            closeButton.onmouseover = function() {
+              this.style.backgroundColor = 'rgba(255, 0, 0, 1)';
+            };
+            closeButton.onmouseout = function() {
+              this.style.backgroundColor = 'rgba(255, 0, 0, 0.8)';
+            };
+            
+            // Add click handler
+            closeButton.onclick = function() {
+              console.log('close-auth-browser-requested');
+            };
+            
+            // Add to document
+            document.body.appendChild(closeButton);
+          `;
+          
+          // Inject the close button when the page loads
+          this._authBrowserView.webContents.on('dom-ready', () => {
+            this._authBrowserView?.webContents.executeJavaScript(closeButtonScript);
+          });
+          
+          // Listen for console messages to detect close button clicks
+          this._authBrowserView.webContents.on('console-message', (event, level, message) => {
+            if (message.includes('close-auth-browser-requested')) {
+              if (this._authBrowserView) {
+                this._win.removeBrowserView(this._authBrowserView);
+                this._authBrowserView = null;
+              }
+            }
+          });
+
           // Handle navigation events
           this._authBrowserView.webContents.on('did-navigate', (event, url) => {
             // Check if we've returned to the game URL or a specific success URL
             // This is where you'd detect when authentication is complete
             if (url.includes('game.dofus-touch.com') || url.includes('auth-success')) {
-              // Remove the browser view when authentication is complete
-              if (this._authBrowserView) {
-                this._win.removeBrowserView(this._authBrowserView)
-                this._authBrowserView = null
-              }
+              logger.info(`Authentication successful, navigated to: ${url}`)
+              
+              // Transfer cookies from the auth browser to the game browser
+              this._transferCookies().then(() => {
+                // Remove the browser view when authentication is complete
+                if (this._authBrowserView) {
+                  this._win.removeBrowserView(this._authBrowserView)
+                  this._authBrowserView = null
+                }
+                
+                // Reload the game window to apply the new cookies
+                this._win.webContents.reload()
+              })
             }
           })
 
@@ -329,6 +423,45 @@ export class GameWindow extends (EventEmitter as new () => TypedEmitter<GameWind
         width: contentBounds.width,
         height: contentBounds.height
       })
+    }
+  }
+
+  // Add a new method to transfer cookies
+  private async _transferCookies() {
+    if (!this._authBrowserView) return
+    
+    try {
+      // Get all cookies from the auth browser
+      const cookies = await this._authBrowserView.webContents.session.cookies.get({})
+      logger.info(`Transferring ${cookies.length} cookies from auth browser to game browser`)
+      
+      // Set each cookie in the game browser
+      for (const cookie of cookies) {
+        try {
+          // Format the cookie for setting in the main window
+          const cookieDetails = {
+            url: cookie.secure ? 'https://' + cookie.domain : 'http://' + cookie.domain,
+            name: cookie.name,
+            value: cookie.value,
+            domain: cookie.domain,
+            path: cookie.path,
+            secure: cookie.secure,
+            httpOnly: cookie.httpOnly,
+            expirationDate: cookie.expirationDate
+          }
+          
+          // Set the cookie in the main window
+          await this._win.webContents.session.cookies.set(cookieDetails)
+          logger.info(`Transferred cookie: ${cookie.name}`)
+        } catch (err) {
+          logger.error(`Failed to transfer cookie ${cookie.name}: ${err}`)
+        }
+      }
+      
+      return true
+    } catch (err) {
+      logger.error(`Failed to transfer cookies: ${err}`)
+      return false
     }
   }
 }
