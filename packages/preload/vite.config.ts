@@ -11,6 +11,8 @@ export default defineConfig({
     minify: process.env./* from mode option */ NODE_ENV === 'production',
     // https://github.com/caoxiemeihao/electron-vue-vite/issues/61
     sourcemap: 'inline',
+    // Increase the chunk size warning limit
+    chunkSizeWarningLimit: 1000, // 1000 KiB
     rollupOptions: {
       input: {
         // multiple entry
@@ -26,6 +28,10 @@ export default defineConfig({
         ...builtinModules
         // ...Object.keys(pkg.dependencies || {}),
       ]
+    },
+    // Enable build caching for faster rebuilds
+    commonjsOptions: {
+      transformMixedEsModules: true
     }
   },
   resolve: {

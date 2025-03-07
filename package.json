@@ -12,6 +12,7 @@
     "lint": "tsc --noEmit -p packages/renderer/tsconfig.json && eslint packages",
     "dev": "concurrently -K -n watch,i18n \"node scripts/watch.mjs\" \"npx typesafe-i18n\"",
     "build": "tsc --noEmit -p packages/renderer/tsconfig.json && node scripts/build.mjs && electron-builder --publish never",
+    "fast-build": "tsc --noEmit -p packages/renderer/tsconfig.json && node scripts/optimized-build.mjs && electron-builder --publish never",
     "typesafe-i18n": "typesafe-i18n"
   },
   "engines": {

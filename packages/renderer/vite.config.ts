@@ -61,7 +61,58 @@ export default defineConfig({
   build: {
     outDir: '../../dist/renderer',
     emptyOutDir: true,
-    sourcemap: true
+    sourcemap: true,
+    // Increase the chunk size warning limit
+    chunkSizeWarningLimit: 1000, // 1000 KiB
+    // Optimize build performance
+    minify: 'terser',
+    terserOptions: {
+      compress: {
+        // Remove console.log in production
+        drop_console: process.env.NODE_ENV === 'production',
+        // Remove debugger statements in production
+        drop_debugger: process.env.NODE_ENV === 'production'
+      }
+    },
+    // Configure manual chunking for better code splitting
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // Split React and related libraries into a separate chunk
+          'react-vendor': [
+            'react',
+            'react-dom',
+            'react-router-dom',
+            '@emotion/react',
+            '@emotion/styled'
+          ],
+          // Split Material UI into a separate chunk
+          'mui-vendor': [
+            '@mui/material',
+            '@mui/icons-material',
+            '@mui/x-date-pickers'
+          ],
+          // Split MobX into a separate chunk
+          'mobx-vendor': [
+            'mobx',
+            'mobx-react-lite',
+            'mobx-state-tree'
+          ],
+          // Split other large dependencies
+          'utils-vendor': [
+            'eventemitter3',
+            'rxjs',
+            'uuid',
+            'axios',
+            'crypto-js'
+          ]
+        }
+      }
+    },
+    // Enable build caching for faster rebuilds
+    commonjsOptions: {
+      transformMixedEsModules: true
+    }
   },
   resolve: {
     alias: {

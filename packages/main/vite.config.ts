@@ -21,8 +21,19 @@ export default defineConfig({
       fileName: () => '[name].cjs'
     },
     rollupOptions: {
-      external: ['electron', 'original-fs', ...builtinModules, ...nodeModules]
-    }
+      external: ['electron', 'original-fs', ...builtinModules, ...nodeModules],
+      output: {
+        manualChunks: (id) => {
+          if (id.includes('node_modules')) {
+            return 'vendor';
+          }
+        }
+      }
+    },
+    commonjsOptions: {
+      transformMixedEsModules: true
+    },
+    chunkSizeWarningLimit: 1000
   },
   resolve: {
     alias: {
