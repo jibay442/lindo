@@ -22,6 +22,20 @@ export const WSAModeScreen: React.FC = () => {
   // Check WSA requirements on component mount
   useEffect(() => {
     checkWSARequirements()
+    
+    // Check if we're on Windows
+    if (navigator.platform.indexOf('Win') === -1) {
+      setError('WSA mode is only available on Windows')
+    }
+    
+    return () => {
+      // Clean up when component unmounts
+      if (wsaWindowCreated) {
+        closeWSAWindow().catch(err => {
+          console.error('Error closing WSA window on unmount:', err)
+        })
+      }
+    }
   }, [])
   
   // Check WSA requirements
@@ -30,14 +44,26 @@ export const WSAModeScreen: React.FC = () => {
       setLoading(true)
       setError(null)
       
-      const requirements = await window.lindoAPI.checkWSARequirements()
+      // Add a timeout to prevent hanging
+      const timeoutPromise = new Promise<{ meetsRequirements: boolean, issues: string[] }>((_, reject) => {
+        setTimeout(() => reject(new Error('Timeout checking WSA requirements')), 10000)
+      })
+      
+      const requirementsPromise = window.lindoAPI.checkWSARequirements()
+      
+      const requirements = await Promise.race([requirementsPromise, timeoutPromise])
       setWsaRequirements(requirements)
       
       if (!requirements.meetsRequirements) {
         setError('WSA requirements not met')
       }
     } catch (error) {
+      console.error('Error checking WSA requirements:', error)
       setError('Failed to check WSA requirements: ' + (error as Error).message)
+      setWsaRequirements({
+        meetsRequirements: false,
+        issues: ['Error checking requirements: ' + (error as Error).message]
+      })
     } finally {
       setLoading(false)
     }
@@ -49,13 +75,21 @@ export const WSAModeScreen: React.FC = () => {
       setLoading(true)
       setError(null)
       
-      const created = await window.lindoAPI.createWSAWindow()
+      // Add a timeout to prevent hanging
+      const timeoutPromise = new Promise<boolean>((_, reject) => {
+        setTimeout(() => reject(new Error('Timeout creating WSA window')), 30000)
+      })
+      
+      const createPromise = window.lindoAPI.createWSAWindow()
+      
+      const created = await Promise.race([createPromise, timeoutPromise])
       setWsaWindowCreated(created)
       
       if (!created) {
         setError('Failed to create WSA window')
       }
     } catch (error) {
+      console.error('Error creating WSA window:', error)
       setError('Failed to create WSA window: ' + (error as Error).message)
     } finally {
       setLoading(false)
@@ -68,13 +102,94 @@ export const WSAModeScreen: React.FC = () => {
       setLoading(true)
       setError(null)
       
-      await window.lindoAPI.closeWSAWindow()
+      // Add a timeout to prevent hanging
+      const timeoutPromise = new Promise<boolean>((_, reject) => {
+        setTimeout(() => reject(new Error('Timeout closing WSA window')), 10000)
+      })
+      
+      const closePromise = window.lindoAPI.closeWSAWindow()
+      
+      await Promise.race([closePromise, timeoutPromise])
       setWsaWindowCreated(false)
     } catch (error) {
+      console.error('Error closing WSA window:', error)
       setError('Failed to close WSA window: ' + (error as Error).message)
     } finally {
       setLoading(false)
     }
+  }
+  
+  // Render error message
+  const renderError = () => {
+    if (!error) return null
+    
+    return (
+      <Alert severity="error" sx={{ mb: 2 }}>
+        {error}
+      </Alert>
+    )
+  }
+  
+  // Render requirements section
+  const renderRequirements = () => {
+    if (loading && !wsaRequirements) {
+      return (
+        <Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}>
+          <CircularProgress />
+        </Box>
+      )
+    }
+    
+    if (wsaRequirements) {
+      return (
+        <>
+          <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+            {wsaRequirements.meetsRequirements ? (
+              <CheckCircleIcon color="success" sx={{ mr: 1 }} />
+            ) : (
+              <ErrorIcon color="error" sx={{ mr: 1 }} />
+            )}
+            <Typography>
+              {wsaRequirements.meetsRequirements
+                ? 'Your system meets all requirements'
+                : 'Your system does not meet all requirements'}
+            </Typography>
+          </Box>
+          
+          {wsaRequirements.issues.length > 0 && (
+            <List dense>
+              {wsaRequirements.issues.map((issue, index) => (
+                <ListItem key={index}>
+                  <ListItemIcon>
+                    <WarningIcon color="warning" />
+                  </ListItemIcon>
+                  <ListItemText primary={issue} />
+                </ListItem>
+              ))}
+            </List>
+          )}
+          
+          <Button
+            variant="outlined"
+            onClick={checkWSARequirements}
+            disabled={loading}
+            sx={{ mt: 1 }}
+          >
+            {loading ? <CircularProgress size={24} /> : 'Refresh'}
+          </Button>
+        </>
+      )
+    }
+    
+    return (
+      <Button
+        variant="outlined"
+        onClick={checkWSARequirements}
+        disabled={loading}
+      >
+        {loading ? <CircularProgress size={24} /> : 'Check Requirements'}
+      </Button>
+    )
   }
   
   return (
@@ -88,67 +203,14 @@ export const WSAModeScreen: React.FC = () => {
         This mode uses Windows Subsystem for Android (WSA) to run the official Dofus Touch Android app.
       </Typography>
       
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
-          {error}
-        </Alert>
-      )}
+      {renderError()}
       
       <Paper sx={{ p: 2, mb: 2 }}>
         <Typography variant="h6" gutterBottom>
           System Requirements
         </Typography>
         
-        {loading && !wsaRequirements ? (
-          <Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}>
-            <CircularProgress />
-          </Box>
-        ) : wsaRequirements ? (
-          <>
-            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-              {wsaRequirements.meetsRequirements ? (
-                <CheckCircleIcon color="success" sx={{ mr: 1 }} />
-              ) : (
-                <ErrorIcon color="error" sx={{ mr: 1 }} />
-              )}
-              <Typography>
-                {wsaRequirements.meetsRequirements
-                  ? 'Your system meets all requirements'
-                  : 'Your system does not meet all requirements'}
-              </Typography>
-            </Box>
-            
-            {wsaRequirements.issues.length > 0 && (
-              <List dense>
-                {wsaRequirements.issues.map((issue, index) => (
-                  <ListItem key={index}>
-                    <ListItemIcon>
-                      <WarningIcon color="warning" />
-                    </ListItemIcon>
-                    <ListItemText primary={issue} />
-                  </ListItem>
-                ))}
-              </List>
-            )}
-            
-            <Button
-              variant="outlined"
-              onClick={checkWSARequirements}
-              disabled={loading}
-              sx={{ mt: 1 }}
-            >
-              Refresh
-            </Button>
-          </>
-        ) : (
-          <Button
-            variant="outlined"
-            onClick={checkWSARequirements}
-            disabled={loading}
-          >
-            Check Requirements
-          </Button>
-        )}
+        {renderRequirements()}
       </Paper>
       
       <Paper sx={{ p: 2 }}>

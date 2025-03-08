@@ -36,16 +36,43 @@ export class WSAWindow extends (EventEmitter as new () => TypedEmitter<WSAWindow
   private _isReady = false
   private _checkInterval: NodeJS.Timeout | null = null
   private _screenshotInterval: NodeJS.Timeout | null = null
+  private _initializationInProgress = false
   
   constructor() {
     super()
+    
+    // Set max listeners to avoid memory leak warnings
+    this.setMaxListeners(20)
+    
+    // Handle app quit
+    app.on('before-quit', () => {
+      this.cleanup()
+    })
   }
   
   /**
    * Initialize the WSA window
    */
   async init(): Promise<boolean> {
+    // Prevent multiple initializations
+    if (this._initializationInProgress) {
+      logger.warn('WSA window initialization already in progress')
+      return false
+    }
+    
+    if (this._isReady) {
+      logger.info('WSA window already initialized')
+      return true
+    }
+    
+    this._initializationInProgress = true
+    
     try {
+      // Check if we're on Windows
+      if (process.platform !== 'win32') {
+        throw new Error('WSA is only supported on Windows')
+      }
+      
       // Check if WSA is installed
       const wsaInstalled = await isWSAInstalled()
       if (!wsaInstalled) {
@@ -86,11 +113,23 @@ export class WSAWindow extends (EventEmitter as new () => TypedEmitter<WSAWindow
         throw new Error('Failed to launch Dofus Touch')
       }
       
-      // Find the WSA window
+      // Find the WSA window with retry
       logger.info('Finding WSA window...')
-      this._wsaHandle = await findWindowByTitle('Windows Subsystem for Android')
+      let retries = 0
+      const maxRetries = 10
+      
+      while (retries < maxRetries && !this._wsaHandle) {
+        this._wsaHandle = await findWindowByTitle('Windows Subsystem for Android')
+        
+        if (!this._wsaHandle) {
+          // Wait before retrying
+          await new Promise(resolve => setTimeout(resolve, 1000))
+          retries++
+        }
+      }
+      
       if (!this._wsaHandle) {
-        throw new Error('Failed to find WSA window')
+        throw new Error('Failed to find WSA window after multiple attempts')
       }
       
       // Verify it's the WSA window
@@ -118,7 +157,8 @@ export class WSAWindow extends (EventEmitter as new () => TypedEmitter<WSAWindow
         webPreferences: {
           nodeIntegration: true,
           contextIsolation: false
-        }
+        },
+        show: false // Don't show until ready
       })
       
       // Load a blank page
@@ -126,9 +166,13 @@ export class WSAWindow extends (EventEmitter as new () => TypedEmitter<WSAWindow
       
       // Set up event listeners
       this._window.on('closed', () => {
+        logger.info('WSA window browser window closed')
         this.cleanup()
         this.emit('closed')
       })
+      
+      // Show the window
+      this._window.show()
       
       // Start checking for WSA window changes
       this._startWindowChecking()
@@ -137,12 +181,18 @@ export class WSAWindow extends (EventEmitter as new () => TypedEmitter<WSAWindow
       this._startScreenshotCapture()
       
       this._isReady = true
+      this._initializationInProgress = false
       this.emit('ready')
       
       return true
     } catch (error) {
       logger.error('Error initializing WSA window:', error)
       this.emit('error', error as Error)
+      this._initializationInProgress = false
+      
+      // Clean up if there was an error
+      this.cleanup()
+      
       return false
     }
   }
@@ -156,23 +206,27 @@ export class WSAWindow extends (EventEmitter as new () => TypedEmitter<WSAWindow
     }
     
     this._checkInterval = setInterval(async () => {
-      if (!this._wsaHandle || !this._window) {
-        return
-      }
-      
-      // Check if the WSA window still exists
-      const isWSA = await isWSAWindow(this._wsaHandle)
-      if (!isWSA) {
-        logger.warn('WSA window no longer exists')
-        this.cleanup()
-        this.emit('closed')
-        return
-      }
-      
-      // Update window position and size
-      const rect = await getWindowRect(this._wsaHandle)
-      if (rect && this._window) {
-        this._window.setBounds(rect)
+      try {
+        if (!this._wsaHandle || !this._window || this._window.isDestroyed()) {
+          return
+        }
+        
+        // Check if the WSA window still exists
+        const isWSA = await isWSAWindow(this._wsaHandle)
+        if (!isWSA) {
+          logger.warn('WSA window no longer exists')
+          this.cleanup()
+          this.emit('closed')
+          return
+        }
+        
+        // Update window position and size
+        const rect = await getWindowRect(this._wsaHandle)
+        if (rect && this._window && !this._window.isDestroyed()) {
+          this._window.setBounds(rect)
+        }
+      } catch (error) {
+        logger.error('Error in window checking interval:', error)
       }
     }, 1000)
   }
@@ -186,13 +240,17 @@ export class WSAWindow extends (EventEmitter as new () => TypedEmitter<WSAWindow
     }
     
     this._screenshotInterval = setInterval(async () => {
-      if (!this._isReady) {
-        return
-      }
-      
-      const screenshotPath = await takeDofusTouchScreenshot()
-      if (screenshotPath) {
-        this.emit('screenshot', screenshotPath)
+      try {
+        if (!this._isReady) {
+          return
+        }
+        
+        const screenshotPath = await takeDofusTouchScreenshot()
+        if (screenshotPath) {
+          this.emit('screenshot', screenshotPath)
+        }
+      } catch (error) {
+        logger.error('Error taking screenshot:', error)
       }
     }, 5000)
   }
@@ -201,6 +259,8 @@ export class WSAWindow extends (EventEmitter as new () => TypedEmitter<WSAWindow
    * Clean up resources
    */
   cleanup(): void {
+    logger.info('Cleaning up WSA window resources')
+    
     if (this._checkInterval) {
       clearInterval(this._checkInterval)
       this._checkInterval = null
@@ -217,12 +277,17 @@ export class WSAWindow extends (EventEmitter as new () => TypedEmitter<WSAWindow
     })
     
     if (this._window && !this._window.isDestroyed()) {
-      this._window.close()
+      try {
+        this._window.close()
+      } catch (error) {
+        logger.error('Error closing WSA window:', error)
+      }
       this._window = null
     }
     
     this._wsaHandle = null
     this._isReady = false
+    this._initializationInProgress = false
   }
   
   /**
@@ -243,7 +308,12 @@ export class WSAWindow extends (EventEmitter as new () => TypedEmitter<WSAWindow
    * Take a screenshot of the WSA window
    */
   async takeScreenshot(): Promise<string> {
-    return takeDofusTouchScreenshot()
+    try {
+      return await takeDofusTouchScreenshot()
+    } catch (error) {
+      logger.error('Error taking screenshot:', error)
+      return ''
+    }
   }
   
   /**
@@ -251,9 +321,14 @@ export class WSAWindow extends (EventEmitter as new () => TypedEmitter<WSAWindow
    */
   async restartDofusTouch(): Promise<boolean> {
     try {
+      // Stop Dofus Touch
       await stopDofusTouch()
-      await launchDofusTouch()
-      return true
+      
+      // Wait a bit
+      await new Promise(resolve => setTimeout(resolve, 1000))
+      
+      // Launch Dofus Touch
+      return await launchDofusTouch()
     } catch (error) {
       logger.error('Error restarting Dofus Touch:', error)
       return false

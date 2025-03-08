@@ -230,37 +230,81 @@ export class Application {
   }
 
   async createWSAWindow(): Promise<WSAWindow | null> {
-    logger.info('Creating WSA window...')
-    
-    // Check WSA requirements
-    const { meetsRequirements, issues } = await checkWSARequirements()
-    if (!meetsRequirements) {
-      logger.error('WSA requirements not met:', issues.join(', '))
+    try {
+      logger.info('Creating WSA window...')
+      
+      // Check if we're on Windows
+      if (process.platform !== 'win32') {
+        logger.error('WSA is only supported on Windows')
+        return null
+      }
+      
+      // Check if WSA window already exists
+      if (this._wsaWindow) {
+        logger.info('WSA window already exists')
+        return this._wsaWindow
+      }
+      
+      // Check WSA requirements
+      const { meetsRequirements, issues } = await checkWSARequirements()
+      if (!meetsRequirements) {
+        logger.error('WSA requirements not met:', issues.join(', '))
+        return null
+      }
+      
+      // Create WSA window
+      this._wsaWindow = new WSAWindow()
+      
+      // Initialize WSA window with timeout
+      const initPromise = this._wsaWindow.init()
+      const timeoutPromise = new Promise<boolean>((resolve) => {
+        setTimeout(() => resolve(false), 30000) // 30 second timeout
+      })
+      
+      const initialized = await Promise.race([initPromise, timeoutPromise])
+      
+      if (!initialized) {
+        logger.error('Failed to initialize WSA window (timeout or error)')
+        this._wsaWindow.cleanup()
+        this._wsaWindow = null
+        return null
+      }
+      
+      // Set up event listeners
+      this._wsaWindow.on('closed', () => {
+        logger.info('WSA window closed')
+        this._wsaWindow = null
+      })
+      
+      this._wsaWindow.on('error', (error) => {
+        logger.error('WSA window error:', error)
+      })
+      
+      return this._wsaWindow
+    } catch (error) {
+      logger.error('Error creating WSA window:', error)
+      
+      // Clean up if there was an error
+      if (this._wsaWindow) {
+        this._wsaWindow.cleanup()
+        this._wsaWindow = null
+      }
+      
       return null
     }
-    
-    // Create WSA window
-    this._wsaWindow = new WSAWindow()
-    
-    // Initialize WSA window
-    const initialized = await this._wsaWindow.init()
-    if (!initialized) {
-      logger.error('Failed to initialize WSA window')
-      this._wsaWindow = null
-      return null
-    }
-    
-    // Set up event listeners
-    this._wsaWindow.on('closed', () => {
-      this._wsaWindow = null
-    })
-    
-    return this._wsaWindow
   }
 
   async closeWSAWindow(): Promise<void> {
-    if (this._wsaWindow) {
-      this._wsaWindow.cleanup()
+    try {
+      if (this._wsaWindow) {
+        logger.info('Closing WSA window...')
+        this._wsaWindow.cleanup()
+        this._wsaWindow = null
+        logger.info('WSA window closed successfully')
+      }
+    } catch (error) {
+      logger.error('Error closing WSA window:', error)
+      // Force cleanup
       this._wsaWindow = null
     }
   }
@@ -372,18 +416,33 @@ export class Application {
     })
 
     ipcMain.handle(IPCEvents.CREATE_WSA_WINDOW, async () => {
-      const wsaWindow = await this.createWSAWindow()
-      return !!wsaWindow
+      try {
+        const wsaWindow = await this.createWSAWindow()
+        return !!wsaWindow
+      } catch (error) {
+        logger.error('Error handling CREATE_WSA_WINDOW:', error)
+        return false
+      }
     })
 
     ipcMain.handle(IPCEvents.CLOSE_WSA_WINDOW, async () => {
-      await this.closeWSAWindow()
-      return true
+      try {
+        await this.closeWSAWindow()
+        return true
+      } catch (error) {
+        logger.error('Error handling CLOSE_WSA_WINDOW:', error)
+        return false
+      }
     })
 
     ipcMain.handle(IPCEvents.CHECK_WSA_REQUIREMENTS, async () => {
-      const requirements = await checkWSARequirements()
-      return JSON.stringify(requirements)
+      try {
+        const requirements = await checkWSARequirements()
+        return JSON.stringify(requirements)
+      } catch (error) {
+        logger.error('Error handling CHECK_WSA_REQUIREMENTS:', error)
+        return JSON.stringify({ meetsRequirements: false, issues: ['Error checking requirements'] })
+      }
     })
   }
 }
