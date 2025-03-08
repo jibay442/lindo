@@ -1,7 +1,8 @@
 /**
- * Windows-specific Build Script
+ * Simple Windows Build Script
  * 
- * This script builds the application specifically for Windows.
+ * This script builds the application for Windows using a simplified approach
+ * without external configuration files.
  */
 
 import { build } from 'vite'
@@ -9,13 +10,14 @@ import { performance } from 'perf_hooks'
 import { execSync } from 'child_process'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
+import fs from 'fs'
 
 // Get the current directory
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 const rootDir = join(__dirname, '..')
 
-console.log('🚀 Starting Windows-specific build...')
+console.log('🚀 Starting simplified Windows build...')
 const startTime = performance.now()
 
 // Build main process
@@ -50,8 +52,8 @@ await build({ configFile: 'packages/renderer/vite.config.ts' })
 const rendererEndTime = performance.now()
 console.log(`✅ Built renderer process in ${((rendererEndTime - rendererStartTime) / 1000).toFixed(2)}s`)
 
-// Run electron-builder with Windows-specific config
-console.log('📦 Running electron-builder with Windows-specific config...')
+// Run electron-builder with direct configuration
+console.log('📦 Running electron-builder with direct configuration...')
 try {
   // Install app dependencies first
   console.log('📦 Installing app dependencies...')
@@ -60,25 +62,75 @@ try {
     cwd: rootDir
   })
   
-  // Run electron-builder with a different command format
-  console.log('📦 Building Windows application...')
-  
-  // Create a temporary package.json with the electron-builder config
-  const fs = await import('fs')
+  // Update package.json with build configuration
+  console.log('📦 Updating package.json with build configuration...')
   const packageJsonPath = join(rootDir, 'package.json')
   const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'))
-  const builderConfigPath = join(rootDir, 'electron-builder-windows.json')
-  const builderConfig = JSON.parse(fs.readFileSync(builderConfigPath, 'utf8'))
   
   // Backup original package.json
   fs.writeFileSync(`${packageJsonPath}.bak`, JSON.stringify(packageJson, null, 2))
   
-  // Merge the builder config into package.json
-  packageJson.build = builderConfig
+  // Add build configuration directly to package.json
+  packageJson.build = {
+    appId: "com.lindo.app",
+    productName: "Lindo",
+    copyright: "Copyright © 2022 Zenox, Prixe",
+    asar: true,
+    directories: {
+      output: "release/${version}",
+      buildResources: "resources"
+    },
+    files: [
+      "dist",
+      "CHANGELOG.md",
+      "LICENCE"
+    ],
+    extraResources: [
+      {
+        from: "resources/icon.png",
+        to: "icon.png"
+      }
+    ],
+    win: {
+      icon: "resources/icon.ico",
+      target: [
+        {
+          target: "portable",
+          arch: [
+            "x64"
+          ]
+        }
+      ],
+      extraResources: [
+        {
+          from: "resources/icon.ico",
+          to: "icon.ico"
+        }
+      ],
+      requestedExecutionLevel: "asInvoker",
+      artifactName: "${productName}-${version}-${arch}.${ext}"
+    },
+    portable: {
+      artifactName: "${productName}-Portable-${version}-${arch}.${ext}"
+    },
+    nsis: {
+      oneClick: false,
+      perMachine: false,
+      allowToChangeInstallationDirectory: true,
+      deleteAppDataOnUninstall: false,
+      artifactName: "${productName}-Setup-${version}-${arch}.${ext}"
+    },
+    npmRebuild: true,
+    nodeGypRebuild: true,
+    buildDependenciesFromSource: true,
+    publish: null
+  }
+  
   fs.writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2))
   
-  // Run electron-builder without specifying config file
-  execSync('electron-builder --win --x64 --publish never', { 
+  // Run electron-builder with simple command
+  console.log('📦 Building Windows application...')
+  execSync('electron-builder --win --x64', { 
     stdio: 'inherit',
     cwd: rootDir
   })
@@ -93,7 +145,6 @@ try {
   
   // Try to restore package.json if it exists
   try {
-    const fs = await import('fs')
     const packageJsonPath = join(rootDir, 'package.json')
     if (fs.existsSync(`${packageJsonPath}.bak`)) {
       fs.copyFileSync(`${packageJsonPath}.bak`, packageJsonPath)

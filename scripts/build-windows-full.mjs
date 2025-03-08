@@ -59,10 +59,10 @@ try {
   process.exit(1)
 }
 
-// Step 4: Build the application
+// Step 4: Build the application using the simple build approach
 console.log('📦 Step 4: Building the application...')
 try {
-  execSync('node scripts/build-windows.mjs', { 
+  execSync('node scripts/build-windows-simple.mjs', { 
     stdio: 'inherit',
     cwd: rootDir
   })

@@ -14,6 +14,7 @@
     "build": "tsc --noEmit -p packages/renderer/tsconfig.json && node scripts/build.mjs && electron-builder --publish never",
     "build-windows": "tsc --noEmit -p packages/renderer/tsconfig.json && node scripts/build-windows.mjs",
     "build-windows-full": "node scripts/build-windows-full.mjs",
+    "build-windows-simple": "node scripts/build-windows-simple.mjs",
     "fix-build": "node scripts/fix-build.mjs",
     "fix-windows": "node scripts/fix-windows-launch.mjs",
     "fix-native-modules": "node scripts/fix-native-modules.mjs",
