@@ -13,12 +13,14 @@
     "dev": "concurrently -K -n watch,i18n \"node scripts/watch.mjs\" \"npx typesafe-i18n\"",
     "build": "tsc --noEmit -p packages/renderer/tsconfig.json && node scripts/build.mjs && electron-builder --publish never",
     "build-windows": "tsc --noEmit -p packages/renderer/tsconfig.json && node scripts/build-windows.mjs",
+    "build-windows-full": "node scripts/build-windows-full.mjs",
     "fix-build": "node scripts/fix-build.mjs",
     "fix-windows": "node scripts/fix-windows-launch.mjs",
     "fix-native-modules": "node scripts/fix-native-modules.mjs",
     "check-main": "node scripts/check-main-process.mjs",
     "fast-build": "tsc --noEmit -p packages/renderer/tsconfig.json && node scripts/optimized-build.mjs && electron-builder --publish never",
-    "typesafe-i18n": "typesafe-i18n"
+    "typesafe-i18n": "typesafe-i18n",
+    "postinstall": "electron-builder install-app-deps"
   },
   "engines": {
     "node": ">=14.17.0"

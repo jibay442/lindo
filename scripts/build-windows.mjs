@@ -53,7 +53,16 @@ console.log(`✅ Built renderer process in ${((rendererEndTime - rendererStartTi
 // Run electron-builder with Windows-specific config
 console.log('📦 Running electron-builder with Windows-specific config...')
 try {
-  execSync('electron-builder --config electron-builder-windows.json --win --x64 --publish never', { 
+  // Install app dependencies first
+  console.log('📦 Installing app dependencies...')
+  execSync('electron-builder install-app-deps', { 
+    stdio: 'inherit',
+    cwd: rootDir
+  })
+  
+  // Run electron-builder with the correct configuration format
+  console.log('📦 Building Windows application...')
+  execSync('electron-builder -c electron-builder-windows.json --win --x64 --publish never', { 
     stdio: 'inherit',
     cwd: rootDir
   })

@@ -47,5 +47,10 @@
     "deleteAppDataOnUninstall": false,
     "artifactName": "${productName}-Setup-${version}-${arch}.${ext}"
   },
+  "npmRebuild": true,
+  "nodeGypRebuild": true,
+  "buildDependenciesFromSource": true,
+  "electronVersion": "19.0.1",
+  "electronDist": "node_modules/electron/dist",
   "publish": null
 } 
