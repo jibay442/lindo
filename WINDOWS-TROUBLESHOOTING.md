@@ -31,13 +31,25 @@ If the app doesn't launch at all, try these steps in order:
 
 If you see errors related to native modules:
 
-1. **Rebuild native modules**:
+1. **Run the native modules fix script**:
    ```bash
-   yarn add electron-rebuild --dev
-   npx electron-rebuild
+   yarn fix-native-modules
    ```
 
-2. **Install specific versions of problematic modules**:
+2. **Rebuild the app**:
+   ```bash
+   yarn build-windows
+   ```
+
+3. **For "n'est pas une application Win32 valide" error**:
+   This error occurs when native modules are not properly built for your Windows version. To fix it:
+   ```bash
+   yarn fix-native-modules
+   yarn fix-windows
+   yarn build-windows
+   ```
+
+4. **Install specific versions of problematic modules**:
    ```bash
    yarn add native-keymap@3.2.3 --dev
    yarn add @hfelix/electron-localshortcut@4.0.0 --dev
@@ -88,6 +100,22 @@ If the game doesn't load properly:
 3. **Check for firewall/antivirus blocking**:
    - Add Lindo to your firewall/antivirus exceptions
 
+### 6. WSA Integration Issues
+
+If you're having issues with the Windows Subsystem for Android (WSA) integration:
+
+1. **Make sure WSA is installed and running**:
+   - Open Windows Features and ensure "Windows Subsystem for Android" is enabled
+   - Launch the "Windows Subsystem for Android" app from the Start menu
+
+2. **Check ADB connection**:
+   - Make sure ADB is installed and in your PATH
+   - Run `adb devices` to check if WSA is detected
+
+3. **Restart WSA**:
+   - Open Windows Subsystem for Android settings
+   - Turn off "Subsystem Resources" and then turn it back on
+
 ## Advanced Troubleshooting
 
 ### Debugging the Main Process
@@ -119,8 +147,9 @@ If all else fails, try a complete rebuild:
 2. **Reinstall dependencies and rebuild**:
    ```bash
    yarn install
-   yarn fix-build
-   yarn build
+   yarn fix-native-modules
+   yarn fix-windows
+   yarn build-windows
    ```
 
 ## Still Having Issues?
