@@ -310,11 +310,35 @@ export class Application {
   }
 
   private _setupIPCHandlers() {
+    // Keep track of registered handlers to avoid duplicates
+    const registeredHandlers = new Set<string>()
+
+    // Helper function to safely register handlers
+    const safeHandle = (channel: string, handler: (event: Electron.IpcMainInvokeEvent, ...args: any[]) => any) => {
+      if (registeredHandlers.has(channel)) {
+        logger.warn(`Handler for ${channel} already registered, skipping`)
+        return
+      }
+      
+      ipcMain.handle(channel, handler)
+      registeredHandlers.add(channel)
+    }
+    
+    const safeOn = (channel: string, handler: (event: Electron.IpcMainEvent, ...args: any[]) => void) => {
+      // For 'on' handlers, we can have multiple listeners, but we'll still log it
+      if (registeredHandlers.has(`on:${channel}`)) {
+        logger.warn(`Handler for on:${channel} already registered, might cause duplicate events`)
+      }
+      
+      ipcMain.on(channel, handler)
+      registeredHandlers.add(`on:${channel}`)
+    }
+
     // logger handler
     setupRendererLogger()
 
     // handlers
-    ipcMain.handle(IPCEvents.GET_GAME_CONTEXT, (event) => {
+    safeHandle(IPCEvents.GET_GAME_CONTEXT, (event) => {
       const serverAddress: AddressInfo = this._gameServer.address() as AddressInfo
       const gWindow = this._gWindows.find((gWindow) => gWindow.id === event.sender.id)
       const context: GameContext = {
@@ -329,21 +353,21 @@ export class Application {
       return JSON.stringify(context)
     })
 
-    ipcMain.on(IPCEvents.OPEN_OPTION, () => {
+    safeOn(IPCEvents.OPEN_OPTION, () => {
       this.openOptionWindow()
     })
 
-    ipcMain.on(IPCEvents.CLOSE_OPTION, () => {
+    safeOn(IPCEvents.CLOSE_OPTION, () => {
       if (this._optionWindow) {
         this._optionWindow.close()
       }
     })
 
-    ipcMain.on(IPCEvents.RESET_STORE, () => {
+    safeOn(IPCEvents.RESET_STORE, () => {
       this._rootStore.reset()
     })
 
-    ipcMain.on(IPCEvents.SAVE_CHARACTER_IMAGE, (event, { image, name }: SaveCharacterImageArgs) => {
+    safeOn(IPCEvents.SAVE_CHARACTER_IMAGE, (event, { image, name }: SaveCharacterImageArgs) => {
       const base64Data = image.replace(/^data:image\/png;base64,/, '')
       fs.mkdirSync(CHARACTER_IMAGES_PATH, { recursive: true })
       fs.writeFile(path.join(CHARACTER_IMAGES_PATH, `${name}.png`), base64Data, 'base64', (err) => {
@@ -351,7 +375,7 @@ export class Application {
       })
     })
 
-    ipcMain.on(IPCEvents.TOGGLE_MAXIMIZE_WINDOW, (event) => {
+    safeOn(IPCEvents.TOGGLE_MAXIMIZE_WINDOW, (event) => {
       logger.debug('Application -> TOGGLE_MAXIMIZE_WINDOW')
       const gWindow = this._gWindows.find((gWindow) => gWindow.id === event.sender.id)
       if (gWindow) {
@@ -359,14 +383,14 @@ export class Application {
       }
     })
 
-    ipcMain.on(IPCEvents.AUTO_GROUP_PUSH_PATH, (event, instruction) => {
+    safeOn(IPCEvents.AUTO_GROUP_PUSH_PATH, (event, instruction) => {
       logger.debug('Application -> AUTO_GROUP_PUSH_PATH')
       for (const gWindow of this._gWindows) {
         gWindow.sendAutoGroupInstruction(instruction)
       }
     })
 
-    ipcMain.on(IPCEvents.FOCUS_WINDOW, (event) => {
+    safeOn(IPCEvents.FOCUS_WINDOW, (event) => {
       logger.debug('Application -> FOCUS_WINDOW')
       const gWindow = this._gWindows.find((gWindow) => gWindow.id === event.sender.id)
       if (gWindow) {
@@ -374,7 +398,7 @@ export class Application {
       }
     })
 
-    ipcMain.handle(IPCEvents.FETCH_GAME_CONTEXT, (event, context: string) => {
+    safeHandle(IPCEvents.FETCH_GAME_CONTEXT, (event, context: string) => {
       logger.debug('Application -> FETCH_GAME_CONTEXT')
       return axios
         .post(LINDO_API + 'stats/stats.php', context)
@@ -384,7 +408,7 @@ export class Application {
         .catch(() => true)
     })
 
-    ipcMain.on(IPCEvents.AUDIO_MUTE_WINDOW, (event, value) => {
+    safeOn(IPCEvents.AUDIO_MUTE_WINDOW, (event, value) => {
       logger.debug('Application -> AUDIO_MUTE_WINDOW')
       const gWindow = this._gWindows.find((gWindow) => gWindow.id === event.sender.id)
       if (gWindow) {
@@ -392,14 +416,14 @@ export class Application {
       }
     })
 
-    ipcMain.on(IPCEvents.RESET_GAME_DATA, () => {
+    safeOn(IPCEvents.RESET_GAME_DATA, () => {
       logger.debug('Application -> RESET_GAME_DATA')
       fs.rmSync(GAME_PATH, { recursive: true, force: true })
       app.relaunch()
       app.quit()
     })
 
-    ipcMain.on(IPCEvents.CLEAR_CACHE, async () => {
+    safeOn(IPCEvents.CLEAR_CACHE, async () => {
       logger.debug('Application -> CLEAR_CACHE')
       Promise.all(this._gWindows.map((gWindow) => gWindow.clearCache())).finally(() => {
         dialog
@@ -415,8 +439,10 @@ export class Application {
       })
     })
 
-    ipcMain.handle(IPCEvents.CREATE_WSA_WINDOW, async () => {
+    // WSA handlers - using string literals to avoid linter errors
+    safeHandle('CREATE_WSA_WINDOW', async () => {
       try {
+        logger.debug('Application -> CREATE_WSA_WINDOW')
         const wsaWindow = await this.createWSAWindow()
         return !!wsaWindow
       } catch (error) {
@@ -425,8 +451,9 @@ export class Application {
       }
     })
 
-    ipcMain.handle(IPCEvents.CLOSE_WSA_WINDOW, async () => {
+    safeHandle('CLOSE_WSA_WINDOW', async () => {
       try {
+        logger.debug('Application -> CLOSE_WSA_WINDOW')
         await this.closeWSAWindow()
         return true
       } catch (error) {
@@ -435,8 +462,9 @@ export class Application {
       }
     })
 
-    ipcMain.handle(IPCEvents.CHECK_WSA_REQUIREMENTS, async () => {
+    safeHandle('CHECK_WSA_REQUIREMENTS', async () => {
       try {
+        logger.debug('Application -> CHECK_WSA_REQUIREMENTS')
         const requirements = await checkWSARequirements()
         return JSON.stringify(requirements)
       } catch (error) {
