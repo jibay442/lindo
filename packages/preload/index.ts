@@ -231,16 +231,34 @@ const clearCache = () => {
 
 // WSA
 const createWSAWindow = async (): Promise<boolean> => {
-  return ipcRenderer.invoke(IPCEvents.CREATE_WSA_WINDOW)
+  return ipcRenderer.invoke('CREATE_WSA_WINDOW')
 }
 
 const closeWSAWindow = async (): Promise<boolean> => {
-  return ipcRenderer.invoke(IPCEvents.CLOSE_WSA_WINDOW)
+  return ipcRenderer.invoke('CLOSE_WSA_WINDOW')
 }
 
 const checkWSARequirements = async (): Promise<{ meetsRequirements: boolean, issues: string[] }> => {
-  const result = await ipcRenderer.invoke(IPCEvents.CHECK_WSA_REQUIREMENTS)
-  return JSON.parse(result)
+  try {
+    const result = await ipcRenderer.invoke('CHECK_WSA_REQUIREMENTS')
+    
+    // Handle case where result is undefined or not a string
+    if (result === undefined || typeof result !== 'string') {
+      console.error('Invalid result from CHECK_WSA_REQUIREMENTS:', result)
+      return {
+        meetsRequirements: false,
+        issues: ['Error: Invalid response from WSA requirements check']
+      }
+    }
+    
+    return JSON.parse(result)
+  } catch (error) {
+    console.error('Error in checkWSARequirements:', error)
+    return {
+      meetsRequirements: false,
+      issues: ['Error checking WSA requirements: ' + (error as Error).message]
+    }
+  }
 }
 
 const logger: LindoLogger = {

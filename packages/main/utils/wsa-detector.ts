@@ -329,34 +329,57 @@ export async function checkWSARequirements(): Promise<{
   meetsRequirements: boolean, 
   issues: string[] 
 }> {
-  const issues: string[] = []
-  
-  // First check if we're on Windows
-  if (process.platform !== 'win32') {
-    issues.push('Windows is required for Windows Subsystem for Android')
-    return { meetsRequirements: false, issues }
-  }
-  
-  // Check if Windows 11
-  const isWin11 = await isWindows11()
-  if (!isWin11) {
-    issues.push('Windows 11 is required for Windows Subsystem for Android')
-  }
-  
-  // Check if WSA is installed
-  const wsaInstalled = await isWSAInstalled()
-  if (!wsaInstalled) {
-    issues.push('Windows Subsystem for Android is not installed')
-  }
-  
-  // Check if ADB is available
-  const adbAvailable = await isADBAvailable()
-  if (!adbAvailable) {
-    issues.push('Android Debug Bridge (ADB) is not available')
-  }
-  
-  return {
-    meetsRequirements: issues.length === 0,
-    issues
+  try {
+    const issues: string[] = []
+    
+    // First check if we're on Windows
+    if (process.platform !== 'win32') {
+      issues.push('Windows is required for Windows Subsystem for Android')
+      return { meetsRequirements: false, issues }
+    }
+    
+    // Check if Windows 11
+    try {
+      const isWin11 = await isWindows11()
+      if (!isWin11) {
+        issues.push('Windows 11 is required for Windows Subsystem for Android')
+      }
+    } catch (error) {
+      logger.error('Error checking Windows version:', error)
+      issues.push('Error checking Windows version: ' + (error as Error).message)
+    }
+    
+    // Check if WSA is installed
+    try {
+      const wsaInstalled = await isWSAInstalled()
+      if (!wsaInstalled) {
+        issues.push('Windows Subsystem for Android is not installed')
+      }
+    } catch (error) {
+      logger.error('Error checking if WSA is installed:', error)
+      issues.push('Error checking if WSA is installed: ' + (error as Error).message)
+    }
+    
+    // Check if ADB is available
+    try {
+      const adbAvailable = await isADBAvailable()
+      if (!adbAvailable) {
+        issues.push('Android Debug Bridge (ADB) is not available')
+      }
+    } catch (error) {
+      logger.error('Error checking if ADB is available:', error)
+      issues.push('Error checking if ADB is available: ' + (error as Error).message)
+    }
+    
+    return {
+      meetsRequirements: issues.length === 0,
+      issues
+    }
+  } catch (error) {
+    logger.error('Error in checkWSARequirements:', error)
+    return {
+      meetsRequirements: false,
+      issues: ['Unexpected error checking WSA requirements: ' + (error as Error).message]
+    }
   }
 } 

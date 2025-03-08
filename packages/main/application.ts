@@ -466,10 +466,23 @@ export class Application {
       try {
         logger.debug('Application -> CHECK_WSA_REQUIREMENTS')
         const requirements = await checkWSARequirements()
-        return JSON.stringify(requirements)
+        
+        // Ensure we're returning a valid JSON string
+        try {
+          return JSON.stringify(requirements)
+        } catch (jsonError) {
+          logger.error('Error stringifying WSA requirements:', jsonError)
+          return JSON.stringify({ 
+            meetsRequirements: false, 
+            issues: ['Error processing WSA requirements'] 
+          })
+        }
       } catch (error) {
         logger.error('Error handling CHECK_WSA_REQUIREMENTS:', error)
-        return JSON.stringify({ meetsRequirements: false, issues: ['Error checking requirements'] })
+        return JSON.stringify({ 
+          meetsRequirements: false, 
+          issues: ['Error checking requirements: ' + (error as Error).message] 
+        })
       }
     })
   }

@@ -52,10 +52,22 @@ export const WSAModeScreen: React.FC = () => {
       const requirementsPromise = window.lindoAPI.checkWSARequirements()
       
       const requirements = await Promise.race([requirementsPromise, timeoutPromise])
+      console.log('WSA requirements:', requirements)
+      
+      // Validate the requirements object
+      if (!requirements || typeof requirements !== 'object') {
+        throw new Error('Invalid requirements response')
+      }
+      
       setWsaRequirements(requirements)
       
       if (!requirements.meetsRequirements) {
-        setError('WSA requirements not met')
+        // Show the first issue as the main error message
+        if (requirements.issues && requirements.issues.length > 0) {
+          setError(requirements.issues[0])
+        } else {
+          setError('WSA requirements not met')
+        }
       }
     } catch (error) {
       console.error('Error checking WSA requirements:', error)
