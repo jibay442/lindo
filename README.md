@@ -23,6 +23,7 @@ Lindo No-Emu works on :
 - [Windows Subsystem for Android (WSA) Mode](#windows-subsystem-for-android-wsa-mode)
   - [Requirements](#requirements)
   - [Setup](#setup)
+  - [Building for WSA Mode](#building-for-wsa-mode)
   - [Usage](#usage)
 - [Development](#development)
   - [Install the project](#install-the-project)
@@ -78,6 +79,14 @@ Lindo now supports running Dofus Touch through Windows Subsystem for Android (WS
 4. Add ADB to your system's PATH environment variable
 5. Launch Lindo and switch to WSA mode
 
+## Building for WSA Mode
+
+When building Lindo for WSA support, use the following command:
+```sh
+$ yarn build-windows-no-native
+```
+This command builds the Windows version without native dependencies, which is required for proper WSA integration. The resulting executable will be in the `release` directory.
+
 ## Usage
 
 1. Launch Lindo
@@ -110,7 +119,16 @@ $ yarn dev
 
 Build the production artefact for your current platform
 ```sh
+# Build for all platforms
 $ yarn build
+
+# Build for Windows without native dependencies (recommended for WSA mode)
+$ yarn build-windows-no-native
+
+# Build for specific platforms
+$ yarn build-win
+$ yarn build-mac
+$ yarn build-linux
 ```
 
 ## Directory structure
