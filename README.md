@@ -20,6 +20,10 @@ Lindo No-Emu works on :
 - [Installation](#installation)
 - [Issues](#issues)
   - [Run the arm64 mac os version for M1/M2 processors](#run-the-arm64-mac-os-version-for-m1m2-processors)
+- [Windows Subsystem for Android (WSA) Mode](#windows-subsystem-for-android-wsa-mode)
+  - [Requirements](#requirements)
+  - [Setup](#setup)
+  - [Usage](#usage)
 - [Development](#development)
   - [Install the project](#install-the-project)
   - [Debug](#debug)
@@ -54,6 +58,35 @@ Download the latest version of Lindo No-Emu from [Github](https://github.com/pri
 ```bash
 $ xattr -d com.apple.quarantine /Applications/Lindo.app
 ```
+
+# Windows Subsystem for Android (WSA) Mode
+
+Lindo now supports running Dofus Touch through Windows Subsystem for Android (WSA), allowing you to play the official Android version of the game on Windows 11.
+
+## Requirements
+
+- Windows 11 (Build 22000 or later)
+- Windows Subsystem for Android installed from Microsoft Store
+- Android Debug Bridge (ADB) installed and available in PATH
+- Virtualization enabled in BIOS/UEFI
+
+## Setup
+
+1. Install Windows Subsystem for Android from the Microsoft Store
+2. Open WSA settings and enable Developer Mode
+3. Install Android Debug Bridge (ADB) from Android SDK Platform Tools
+4. Add ADB to your system's PATH environment variable
+5. Launch Lindo and switch to WSA mode
+
+## Usage
+
+1. Launch Lindo
+2. Click the Android icon in the top-right corner to switch to WSA mode
+3. The application will check if your system meets all requirements
+4. If all requirements are met, click "Launch Dofus Touch" to start the game
+5. The game will launch in a new window using WSA
+
+Note: WSA mode is only available on Windows 11. Make sure you have properly set up Windows Subsystem for Android and enabled Developer Mode in WSA settings.
 
 # Development
 
